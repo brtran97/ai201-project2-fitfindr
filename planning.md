@@ -138,12 +138,16 @@ Write out what a full user interaction looks like from start to finish — tool 
 
 **Step 1:**
 <!-- What does the agent do first? Which tool is called? With what input? -->
+The agent will create a fresh session dict then it will parse the query to extract the description, size, max_price. Then it will make a tool call to search_listings(vintage graphic tee, size=None, 30) with the 3 parameters it parses from the query. This tool will filter out the listings.json for all the items in the database that match the parameters sorting by relevance. If no results the agent will return early and sugget a helpful message it will not make any further tool calls. If the tool returns selected_item store them in the session memory.
 
 **Step 2:**
 <!-- What happens next? What was returned from step 1? What tool is called now? -->
+Then the agent will call on suggest_outfit tool it will take in the new items from step 1 and the existing user wardrobe then the agent will build a suggested outfit by combining the new item with existing wardrobe pieces. It will store the suggested outfit. If there is no existing wardrobe it will suggest a general styling from the LLM. 
 
 **Step 3:**
 <!-- Continue until the full interaction is complete -->
+The next tool call is on create_fit_card which will take a the outfit suggestion and selected_item and create a caption for social media that mentions the item's name, price and platform. If the outfit suggestion is empty, the tool will return a descriptive error. The agent will also store this social media caption.
 
 **Final output to user:**
 <!-- What does the user actually see at the end? -->
+Finally what the user will see is the UI panels will be populated with the select_items which are all listing details that match their query, the outfit suggestion (using their wardrobe if possible) and a fitcard that contains a social media style description out their awesome thrifted find.
