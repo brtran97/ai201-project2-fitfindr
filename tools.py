@@ -13,6 +13,7 @@ Tools:
 """
 
 import os
+import re
 
 from dotenv import load_dotenv
 from groq import Groq
@@ -69,8 +70,40 @@ def search_listings(
 
     Before writing code, fill in the Tool 1 section of planning.md.
     """
-    # Replace this with your implementation
-    return []
+    _STOP_WORDS = {"a", "an", "the", "in", "on", "of", "for", "and", "or", "to", "is", "it"}
+
+    try:
+        listings = load_listings()
+
+        if max_price is not None:
+            listings = [l for l in listings if l["price"] <= max_price]
+
+        if size is not None:
+            filter_size = size.strip().lower()
+            def _size_matches(listing_size):
+                segments = re.split(r'[/\s()]+', listing_size.lower())
+                return any(filter_size == seg for seg in segments if seg)
+            listings = [l for l in listings if _size_matches(l["size"])]
+
+        keywords = [w for w in description.lower().split() if w not in _STOP_WORDS]
+
+        scored = []
+        for listing in listings:
+            searchable = " ".join([
+                listing["title"],
+                listing["description"],
+                " ".join(listing["style_tags"]),
+                listing["category"],
+                " ".join(listing["colors"]),
+            ]).lower()
+            score = sum(1 for kw in keywords if kw in searchable)
+            if score > 0:
+                scored.append((score, listing))
+
+        scored.sort(key=lambda x: x[0], reverse=True)
+        return [item for _, item in scored]
+    except Exception:
+        return []
 
 
 # ── Tool 2: suggest_outfit ────────────────────────────────────────────────────
@@ -100,8 +133,73 @@ def suggest_outfit(new_item: dict, wardrobe: dict) -> str:
 
     Before writing code, fill in the Tool 2 section of planning.md.
     """
-    # Replace this with your implementation
-    return ""
+    try:
+        client = _get_groq_client()
+
+        item_details = (
+            f"- Item: {new_item['title']}\n"
+            f"- Description: {new_item['description']}\n"
+            f"- Category: {new_item['category']}\n"
+            f"- Style: {', '.join(new_item['style_tags'])}\n"
+            f"- Colors: {', '.join(new_item['colors'])}\n"
+            f"- Condition: {new_item['condition']}\n"
+            f"- Price: ${new_item['price']}"
+        )
+
+        if not wardrobe.get("items"):
+            system_msg = (
+                "You are a personal stylist who specializes in secondhand fashion. "
+                "The user is considering buying a thrifted item but hasn't told you what's "
+                "in their wardrobe yet. Give general styling advice: what kinds of pieces "
+                "pair well with this item, what vibes or aesthetics it works for, and "
+                "2-3 specific outfit ideas using common wardrobe staples. "
+                "Keep it conversational and helpful — like advice from a stylish friend."
+            )
+            user_msg = (
+                f"I'm considering this thrifted find:\n{item_details}\n\n"
+                "I haven't shared my wardrobe yet. What are some ways I could style this piece?"
+            )
+        else:
+            wardrobe_lines = []
+            for item in wardrobe["items"]:
+                line = (
+                    f"- {item['name']} ({item['category']}) — "
+                    f"colors: {', '.join(item['colors'])}, "
+                    f"style: {', '.join(item['style_tags'])}"
+                )
+                if item.get("notes"):
+                    line += f", notes: {item['notes']}"
+                wardrobe_lines.append(line)
+            formatted_wardrobe = "\n".join(wardrobe_lines)
+
+            system_msg = (
+                "You are a personal stylist who specializes in secondhand fashion. "
+                "The user wants to know how a thrifted item would fit into their existing "
+                "wardrobe. Suggest 1-2 complete outfits that pair the new item with "
+                "SPECIFIC pieces from their wardrobe — reference each piece by name. "
+                "Explain why the combination works (color coordination, style matching, etc.). "
+                "Keep it conversational — like advice from a stylish friend."
+            )
+            user_msg = (
+                f"I'm considering this thrifted find:\n{item_details}\n\n"
+                f"Here's what I already have in my wardrobe:\n{formatted_wardrobe}\n\n"
+                "Suggest 1-2 complete outfits pairing this new item with specific pieces from my wardrobe."
+            )
+
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": system_msg},
+                {"role": "user", "content": user_msg},
+            ],
+            temperature=0.7,
+            max_tokens=512,
+        )
+
+        result = response.choices[0].message.content.strip()
+        return result if result else "This item has great styling potential — try pairing it with basics in complementary colors."
+    except Exception:
+        return "I couldn't generate styling suggestions right now. Try again in a moment."
 
 
 # ── Tool 3: create_fit_card ───────────────────────────────────────────────────
@@ -133,5 +231,42 @@ def create_fit_card(outfit: str, new_item: dict) -> str:
 
     Before writing code, fill in the Tool 3 section of planning.md.
     """
-    # Replace this with your implementation
-    return ""
+    if not outfit or not outfit.strip():
+        return "Couldn't generate a fit card — no outfit suggestion was provided. Try running the search again."
+
+    try:
+        client = _get_groq_client()
+
+        system_msg = (
+            "You are a Gen-Z fashion content creator writing Instagram/TikTok captions "
+            "for thrifted outfit posts. Write a 2-4 sentence caption that:\n"
+            "- Feels casual and authentic (like a real OOTD post, not a product ad)\n"
+            "- Mentions the item name, price, and platform naturally (once each)\n"
+            "- Captures the outfit vibe with specific style language\n"
+            "- Uses lowercase, might include an emoji or two, but isn't over-the-top\n"
+            "Do NOT include hashtags. Just the caption text."
+        )
+        user_msg = (
+            f"Write a caption for this outfit post:\n\n"
+            f"The thrifted find: {new_item['title']}\n"
+            f"- Price: ${new_item['price']}\n"
+            f"- From: {new_item['platform']}\n"
+            f"- Style: {', '.join(new_item['style_tags'])}\n"
+            f"- Colors: {', '.join(new_item['colors'])}\n\n"
+            f"The full outfit idea:\n{outfit}"
+        )
+
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": system_msg},
+                {"role": "user", "content": user_msg},
+            ],
+            temperature=0.9,
+            max_tokens=256,
+        )
+
+        result = response.choices[0].message.content.strip()
+        return result if result else "Found a great thrifted piece — check it out!"
+    except Exception:
+        return "Couldn't generate a fit card right now. Try again in a moment."
