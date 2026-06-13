@@ -76,7 +76,7 @@ If `outfit` is empty or whitespace-only, the tool returns a descriptive error me
 
 The planning loop runs inside `run_agent(query, wardrobe)` and follows a conditional sequence — each step checks the result of the previous step before proceeding:
 
-1. **Parse the query**: Extract `description`, `size`, and `max_price` from the user's natural language input. Store in `session["parsed"]`.
+1. **Parse the query using the LLM**: Send the user's natural language query to Groq (`llama-3.3-70b-versatile`) with a system prompt instructing it to extract three fields as JSON: `description` (str), `size` (str or null), and `max_price` (float or null). This handles varied phrasing like "nothing over thirty bucks" or "medium sized" that regex would miss. Parse the JSON response and store in `session["parsed"]`.
 2. **Call `search_listings(description, size, max_price)`**. Store results in `session["search_results"]`.
    - **If `search_results` is empty**: set `session["error"]` to a helpful message suggesting the user broaden their search, and **return the session immediately**. Do not call any further tools.
    - **If results exist**: set `session["selected_item"] = search_results[0]` (the top-ranked match) and continue.
