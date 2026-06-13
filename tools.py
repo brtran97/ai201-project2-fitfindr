@@ -153,7 +153,7 @@ def suggest_outfit(new_item: dict, wardrobe: dict) -> str:
                 "in their wardrobe yet. Give general styling advice: what kinds of pieces "
                 "pair well with this item, what vibes or aesthetics it works for, and "
                 "2-3 specific outfit ideas using common wardrobe staples. "
-                "Keep it conversational and helpful — like advice from a stylish friend."
+                "Keep it conversational and brief — 3-5 sentences max, like a quick text from a stylish friend."
             )
             user_msg = (
                 f"I'm considering this thrifted find:\n{item_details}\n\n"
@@ -177,8 +177,8 @@ def suggest_outfit(new_item: dict, wardrobe: dict) -> str:
                 "The user wants to know how a thrifted item would fit into their existing "
                 "wardrobe. Suggest 1-2 complete outfits that pair the new item with "
                 "SPECIFIC pieces from their wardrobe — reference each piece by name. "
-                "Explain why the combination works (color coordination, style matching, etc.). "
-                "Keep it conversational — like advice from a stylish friend."
+                "Briefly explain why the combination works. "
+                "Keep it conversational and concise — 3-5 sentences per outfit, no lengthy explanations."
             )
             user_msg = (
                 f"I'm considering this thrifted find:\n{item_details}\n\n"
@@ -193,7 +193,7 @@ def suggest_outfit(new_item: dict, wardrobe: dict) -> str:
                 {"role": "user", "content": user_msg},
             ],
             temperature=0.7,
-            max_tokens=512,
+            max_tokens=256,
         )
 
         result = response.choices[0].message.content.strip()
@@ -263,7 +263,7 @@ def create_fit_card(outfit: str, new_item: dict) -> str:
                 {"role": "user", "content": user_msg},
             ],
             temperature=0.9,
-            max_tokens=256,
+            max_tokens=128,
         )
 
         result = response.choices[0].message.content.strip()
